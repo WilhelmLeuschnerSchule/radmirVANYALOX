@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Автосалон Радмир — Поиск машин Ваня лох Ваня лох Ваня лох</title>
+    <!-- Подключаем стили для красоты -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #333;
+        }
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: #007bff;
+        }
+        /* Стили для выпадающего списка подсказок */
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+        }
+        .suggestions div {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        .suggestions div:hover {
+            background-color: #f0f0f0;
+        }
+        /* Стили для карточек машин на странице */
+        .cars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, min(250px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .car-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+            border: 1px solid #eee;
+            transition: transform 0.2s;
+        }
+        .car-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .car-card h3 {
+            margin: 10px 0;
+            color: #222;
+        }
+        .car-card p {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+    <!-- Подключаем библиотеку Fuse.js для умного поиска с опечатками -->
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+</head>
+<body>
+
+    <h1>Машины Радмира</h1>
+
+    <!-- Строка поиска -->
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Введите название машины (например: Ваня лох)..." autocomplete="off">
+        <div id="suggestions" class="suggestions"></div>
+    </div>
+
+    <!-- Список всех машин -->
+    <div class="cars-grid" id="carsGrid">
+        <!-- Карточки будут созданы автоматически через JavaScript -->
+    </div>
+
+    <script>
+        // 1. База данных машин (сюда тебе нужно будет выписать машины с Вики Радмира)
+        // id — это уникальный префикс, к которому мы будем прокручивать страницу
+        const carsData = [
+         { id: "leukh", name: "Ваня леух", price: "999,000,000 руб. Утиль:Не продается" },
+
+{ id: "golf_r", name: "Volkswagen Golf R", price: "2,000,000 руб. Утиль:300,000" },
+
+{ id: "passat_b8", name: "Volkswagen Passat B8", price: "1,800,000 руб. Утиль:270,000" },
+
+{ id: "bmw_m3_e92", name: "BMW M3 E92", price: "3,200,000 руб. Утиль:480,000" },
+
+{ id: "audi_a6_c7", name: "Audi A6 C7", price: "2,100,000 руб. Утиль:315,000" },
+
+{ id: "camry_v70", name: "Toyota Camry V70", price: "2,400,000 руб. Утиль:360,000" },
+
+{ id: "lancer_evo_ix", name: "Mitsubishi Lancer EVO IX", price: "2,000,000 руб. Утиль:300,000" },
+
+{ id: "focus_rs", name: "Ford Focus RS", price: "1,800,000 руб. Утиль:270,000" },
+
+{ id: "bmw_x5_e53", name: "BMW X5 E53", price: "1,300,000 руб. Утиль:195,000" },
+
+{ id: "rx7_spirit_r", name: "Mazda RX-7 Spirit R", price: "1,600,000 руб. Утиль:240,000" },
+
+{ id: "f150_raptor", name: "Ford F-150 Raptor", price: "2,800,000 руб. Утиль:420,000" },
+
+{ id: "bmw_540i_e34", name: "BMW 540i E34", price: "900,000 руб. Утиль:135,000" },
+     { id: "focus3", name: "Ford Focus 3", price: "720.000 руб. Утиль:108.000" },
+{ id: "e420", name: "Mercedes E420 W210", price: "1.300.000 руб. Утиль:195.000" },
+{ id: "540e39", name: "BMW 540i E39", price: "1.300.000 руб. Утиль:195.000" },
+{ id: "supraa80", name: "Toyota Supra A80", price: "1.600.000 руб. Утиль:240.000" },
+{ id: "wrxsti", name: "Subaru WRX STI", price: "1.800.000 руб. Утиль:270.000" },
+{ id: "skylineer34", name: "Nissan Skyline ER34", price: "1.200.000 руб. Утиль:180.000" },
+{ id: "s600w140", name: "Mercedes S600 W140", price: "1.300.000 руб. Утиль:195.000" },
+{ id: "m5e60", name: "BMW M5 E60", price: "3.000.000 руб. Утиль:450.000" },
+{ id: "x6me71", name: "BMW X6M E71", price: "2.600.000 руб. Утиль:390.000" },
+{ id: "x5me70", name: "BMW X5M E70", price: "2.500.000 руб. Утиль:375.000" },
+
+{ id: "chaser", name: "Toyota Chaser", price: "1.100.000 руб. Утиль:165.000" },
+{ id: "touaregi", name: "Volkswagen Touareg I", price: "1.500.000 руб. Утиль:225.000" },
+{ id: "750e38", name: "BMW 750i E38", price: "1.400.000 руб. Утиль:210.000" },
+{ id: "markii90", name: "Toyota Mark II 90", price: "1.050.000 руб. Утиль:157.500" },
+{ id: "camryv55", name: "Toyota Camry V55", price: "1.500.000 руб. Утиль:225.000" },
+{ id: "altezza", name: "Toyota Altezza", price: "1.000.000 руб. Утиль:150.000" },
+{ id: "accordtypeS", name: "Honda Accord Type S", price: "990.000 руб. Утиль:148.500" },
+{ id: "scirocco", name: "Volkswagen Scirocco", price: "1.600.000 руб. Утиль:240.000" },
+{ id: "isf", name: "Lexus IS F", price: "2.200.000 руб. Утиль:330.000" },
+{ id: "mps3", name: "Mazda 3 MPS", price: "750.000 руб. Утиль:112.500" },
+
+{ id: "mx5", name: "Mazda MX-5", price: "1.020.000 руб. Утиль:153.000" },
+{ id: "s15", name: "Nissan Silvia S15", price: "1.400.000 руб. Утиль:210.000" },
+{ id: "w124e500", name: "Mercedes W124 E500", price: "900.000 руб. Утиль:135.000" },
+{ id: "grandcherokee", name: "Jeep Grand Cherokee", price: "800.000 руб. Утиль:120.000" },
+{ id: "prado150", name: "Toyota LC Prado 150", price: "2.300.000 руб. Утиль:345.000" },
+{ id: "evox", name: "Mitsubishi Lancer EVO X", price: "800.000 руб. Утиль:120.000" },
+{ id: "camry40", name: "Toyota Camry V40", price: "850.000 руб. Утиль:127.500" },
+{ id: "imprezawrx", name: "Subaru Impreza WRX STI", price: "1.500.000 руб. Утиль:225.000" },
+{ id: "cls63c218", name: "Mercedes CLS63 AMG C218", price: "4.500.000 руб. Утиль:675.000" },
+{ id: "s38v", name: "Audi S3 8V", price: "2.100.000 руб. Утиль:315.000" },
+{ id: "rs6c5", name: "Audi RS6 C5", price: "1.500.000 руб. Утиль:225.000" },
+{ id: "v60volvo", name: "Volvo V60", price: "1.800.000 руб. Утиль:270.000" },
+{ id: "quattro", name: "Audi Quattro", price: "2.500.000 руб. Утиль:375.000" },
+{ id: "q7v12", name: "Audi Q7 V12 TDI", price: "2.500.000 руб. Утиль:375.000" },
+{ id: "s65w221", name: "Mercedes S65 AMG V221", price: "3.200.000 руб. Утиль:480.000" },
+
+{ id: "ml63w164", name: "Mercedes ML63 AMG W164", price: "2.000.000 руб. Утиль:300.000" },
+{ id: "f02_740", name: "BMW 740 F02", price: "2.900.000 руб. Утиль:435.000" },
+{ id: "xc90", name: "Volvo XC90", price: "3.150.000 руб. Утиль:472.500" },
+{ id: "supra90", name: "Toyota Supra GR A90", price: "6.000.000 руб. Утиль:900.000" },
+{ id: "xclass", name: "Mercedes X-Class", price: "2.500.000 руб. Утиль:375.000" },
+
+{ id: "c63w204", name: "Mercedes C63 W204", price: "3.200.000 руб. Утиль:480.000" },
+{ id: "camry70", name: "Toyota Camry V70", price: "3.500.000 руб. Утиль:525.000" },
+{ id: "mark2100", name: "Toyota Mark II 100", price: "1.200.000 руб. Утиль:180.000" },
+{ id: "s2000", name: "Honda S2000", price: "1.600.000 руб. Утиль:240.000" },
+{ id: "e36_325", name: "BMW 325i E36", price: "700.000 руб. Утиль:105.000" },
+
+{ id: "fk8", name: "Honda Civic Type R FK8", price: "2.000.000 руб. Утиль:300.000" },
+{ id: "m3e46", name: "BMW M3 E46", price: "1.300.000 руб. Утиль:195.000" },
+{ id: "1me82", name: "BMW 1M E82", price: "1.500.000 руб. Утиль:225.000" },
+{ id: "fn2", name: "Honda Civic Type R FN2", price: "900.000 руб. Утиль:135.000" },
+{ id: "octaviavrs", name: "Skoda Octavia VRS", price: "2.000.000 руб. Утиль:300.000" },
+
+{ id: "370z", name: "Nissan 370Z", price: "1.800.000 руб. Утиль:270.000" },
+{ id: "m3e92", name: "BMW M3 E92", price: "2.500.000 руб. Утиль:375.000" },
+{ id: "mustanggt", name: "Ford Mustang GT", price: "4.000.000 руб. Утиль:600.000" },
+{ id: "giulia", name: "Alfa Romeo Giulia", price: "4.000.000 руб. Утиль:600.000" },
+{ id: "lc100", name: "Toyota Land Cruiser 100", price: "1.600.000 руб. Утиль:240.000" },
+        { id: "land_rover_defender", name: "Land Rover Defender", price: "4.800.000 рублей Утиль:720.000" },
+
+{ id: "chevrolet_suburban", name: "Chevrolet Suburban", price: "1.200.000 рублей Утиль:180.000" },
+
+{ id: "jeep_gladiator", name: "Jeep Gladiator", price: "6.000.000 рублей Утиль:900.000" },
+
+{ id: "infinity_q50", name: "Infinity Q50", price: "2.800.000 рублей Утиль:420.000" },
+
+{ id: "mercedes_s320_w220", name: "Mercedes S320 CDI W220", price: "700.000 рублей Утиль:105.000" },
+
+{ id: "mercedes_gl63_x166", name: "Mercedes GL63 AMG X166", price: "3.800.000 рублей Утиль:570.000" },
+
+{ id: "nissan_400z", name: "Nissan 400Z", price: "2.500.000 рублей Утиль:375.000" },
+
+{ id: "subaru_impreza_wrx_sti", name: "Subaru Impreza WRX STI", price: "1.200.000 рублей Утиль:180.000" },
+
+{ id: "toyota_4runner", name: "Toyota 4Runner", price: "3.000.000 рублей Утиль:450.000" },
+
+{ id: "vw_touareg_nf", name: "Volkswagen Touareg NF", price: "1.900.000 рублей Утиль:285.000" },
+
+{ id: "lexus_rcf", name: "Lexus RC-F", price: "4.000.000 рублей Утиль:600.000" },
+
+{ id: "mini_jcw_gp", name: "Mini JCW GP", price: "1.700.000 рублей Утиль:255.000" },
+
+{ id: "toyota_tundra", name: "Toyota Tundra", price: "3.500.000 рублей Утиль:525.000" },
+
+{ id: "mercedes_cls53_c257", name: "Mercedes CLS53 C257", price: "5.500.000 рублей Утиль:825.000" },
+
+{ id: "hummer_h2", name: "Hummer H2", price: "3.000.000 рублей Утиль:450.000" },
+
+{ id: "kia_k5", name: "KIA K5", price: "3.000.000 рублей Утиль:450.000" },
+
+{ id: "mercedes_cls63_s219", name: "Mercedes CLS63 AMG S219", price: "3.000.000 рублей Утиль:450.000" },
+
+{ id: "bmw_330d_g20", name: "BMW 330D G20", price: "4.000.000 рублей Утиль:600.000" },
+
+{ id: "zeekr_001", name: "Zeekr 001", price: "3.500.000 рублей Утиль:525.000" },
+
+{ id: "chevrolet_corvette_c6", name: "Chevrolet Corvette C6", price: "4.500.000 рублей Утиль:675.000" },
+
+{ id: "vw_passat_b8", name: "Volkswagen Passat B8", price: "1.500.000 рублей Утиль:225.000" },
+
+{ id: "toyota_lc200_ii", name: "Toyota LC 200 II", price: "4.000.000 рублей Утиль:600.000" },
+
+{ id: "mercedes_e63_w211", name: "Mercedes E63 AMG W211", price: "3.800.000 рублей Утиль:570.000" },
+
+{ id: "nissan_180sx", name: "Nissan 180SX", price: "1.200.000 рублей Утиль:180.000" },
+      { id: "hyundai_santa_fe", name: "Hyundai Santa Fe", price: "700.000 рублей Утиль:105.000" },
+
+{ id: "porsche_cayenne", name: "Porsche Cayenne", price: "10.000.000 рублей Утиль:1.500.000" },
+
+{ id: "mercedes_e63_w212", name: "Mercedes E63s AMG W212", price: "5.000.000 рублей Утиль:750.000" },
+
+{ id: "audi_rs6_c7_avant", name: "Audi RS6 C7 Avant", price: "6.000.000 рублей Утиль:900.000" },
+
+{ id: "rolls_royce_phantom_vii", name: "Rolls-Royce Phantom VII", price: "16.500.000 рублей Утиль:2.475.000" },
+
+{ id: "mercedes_c63s_c205", name: "Mercedes C63s AMG C205", price: "7.000.000 рублей Утиль:1.050.000" },
+
+{ id: "lamborghini_aventador_sv", name: "Lamborghini Aventador SV", price: "29.000.000 рублей Утиль:4.350.000" },
+
+{ id: "maybach_x222", name: "Maybach X222", price: "13.000.000 рублей Утиль:1.950.000" },
+
+{ id: "ferrari_488", name: "Ferrari 488", price: "20.000.000 рублей Утиль:3.000.000" },
+
+{ id: "bmw_540i_g30", name: "BMW G30 540i LCI", price: "6.000.000 рублей Утиль:900.000" },
+
+{ id: "audi_r8", name: "Audi R8", price: "9.000.000 рублей Утиль:1.350.000" },
+
+{ id: "toyota_land_cruiser_200_iii", name: "Toyota LC 200 III", price: "7.000.000 рублей Утиль:1.050.000" },
+
+{ id: "land_rover_sva", name: "Land Rover SVA", price: "10.000.000 рублей Утиль:1.500.000" },
+
+{ id: "dodge_challenger_srt", name: "Dodge Challenger SRT", price: "5.600.000 рублей Утиль:840.000" },
+
+{ id: "rolls_royce_wraith", name: "Rolls-Royce Wraith", price: "20.000.000 рублей Утиль:3.000.000" },
+
+{ id: "nissan_gtr_r35", name: "Nissan GT-R R35", price: "6.800.000 рублей Утиль:1.020.000" },
+
+{ id: "bentley_bentayga", name: "Bentley Bentayga", price: "15.000.000 рублей Утиль:2.250.000" },
+
+{ id: "porsche_911_991", name: "Porsche 911 991", price: "15.000.000 рублей Утиль:2.250.000" },
+
+{ id: "ferrari_portofino", name: "Ferrari Portofino", price: "12.000.000 рублей Утиль:1.800.000" },
+
+{ id: "tesla_model_s", name: "Tesla Model S", price: "6.000.000 рублей Утиль:900.000" },
+
+{ id: "bmw_m4_f82", name: "BMW M4 F82 LCI", price: "4.500.000 рублей Утиль:675.000" },
+
+{ id: "mercedes_g63_6x6", name: "Mercedes G63 6X6", price: "18.000.000 рублей Утиль:2.700.000" },
+
+{ id: "mercedes_g63_w463", name: "Mercedes G63 W463 II", price: "7.000.000 рублей Утиль:1.050.000" },
+
+{ id: "ford_mustang_gt", name: "Ford Mustang GT", price: "5.500.000 рублей Утиль:825.000" },
+
+{ id: "bmw_x5m_f85", name: "BMW X5M F85", price: "7.000.000 рублей Утиль:1.050.000" },
+
+{ id: "maybach_s650_pullman", name: "Maybach S650 Pullman", price: "25.000.000 рублей Утиль:3.750.000" },
+
+{ id: "lamborghini_urus", name: "Lamborghini Urus", price: "25.000.000 рублей Утиль:3.750.000" },
+       { id: "lexus_lx570", name: "Lexus LX570", price: "8.000.000 рублей Утиль:1.200.000" },
+
+{ id: "jeep_trackhawk", name: "Jeep GC Trackhawk", price: "10.000.000 рублей Утиль:1.500.000" },
+
+{ id: "cadillac_escalade", name: "Cadillac Escalade", price: "10.000.000 рублей Утиль:1.500.000" },
+
+{ id: "mercedes_560sec_c126", name: "Mercedes 560 SEC C126", price: "10.000.000 рублей Утиль:1.500.000" },
+
+{ id: "bugatti_chiron", name: "Bugatti Chiron", price: "100.000.000 рублей Утиль:15.000.000" },
+
+{ id: "audi_rs7_c7", name: "Audi RS7 C7", price: "5.300.000 рублей Утиль:795.000" },
+
+{ id: "bmw_x6m_f86", name: "BMW X6M F86", price: "7.000.000 рублей Утиль:1.050.000" },
+
+{ id: "bmw_m1_e26", name: "BMW M1 E26", price: "22.000.000 рублей Утиль:3.300.000" },
+
+{ id: "bmw_m5_f90", name: "BMW M5 F90", price: "13.000.000 рублей Утиль:1.950.000" },
+
+{ id: "bmw_x3m_f97", name: "BMW X3M F97 LCI", price: "10.000.000 рублей Утиль:1.500.000" },
+
+{ id: "bmw_i8", name: "BMW i8 L12 LCI", price: "5.500.000 рублей Утиль:825.000" },
+
+{ id: "chevrolet_corvette_c7", name: "Chevrolet Corvette C7", price: "6.000.000 рублей Утиль:900.000" },
+
+{ id: "mercedes_gt63s", name: "Mercedes GT63s AMG E", price: "16.000.000 рублей Утиль:2.400.000" },
+
+{ id: "mclaren_p1", name: "McLaren P1", price: "20.000.000 рублей Утиль:3.000.000" },
+
+{ id: "mercedes_e63_w213", name: "Mercedes E63s AMG W213", price: "12.300.000 рублей Утиль:1.845.000" },
+
+{ id: "tesla_model_x", name: "Tesla Model X", price: "7.000.000 рублей Утиль:1.050.000" },
+
+{ id: "fenyr_supersport", name: "W Motors Fenyr SuperSport", price: "40.000.000 рублей Утиль:6.000.000" },
+
+{ id: "mercedes_e63_w213_f", name: "Mercedes E63s AMG W213 F", price: "14.500.000 рублей Утиль:2.175.000" },
+
+{ id: "rolls_royce_cullinan", name: "Rolls-Royce Cullinan", price: "55.000.000 рублей Утиль:8.250.000" },
+
+{ id: "range_rover_velar", name: "Range Rover Velar", price: "6.000.000 рублей Утиль:900.000" },
+
+{ id: "bmw_x7_g07", name: "BMW X7 G07", price: "12.000.000 рублей Утиль:1.800.000" },
+
+{ id: "bmw_m5_f90_lci", name: "BMW M5 F90 LCI", price: "15.000.000 рублей Утиль:2.250.000" },
+
+{ id: "acura_nsx", name: "Acura NSX", price: "15.000.000 рублей Утиль:2.250.000" },
+
+{ id: "bmw_m8_f92", name: "BMW M8 F92", price: "15.500.000 рублей Утиль:2.325.000" },
+
+{ id: "bmw_m4_g82", name: "BMW M4 G82", price: "11.000.000 рублей Утиль:1.650.000" },
+
+{ id: "mercedes_s63_v222", name: "Mercedes S63 AMG V222", price: "11.000.000 рублей Утиль:1.650.000" },
+
+{ id: "mercedes_s500_w222", name: "Mercedes S500 W222", price: "6.000.000 рублей Утиль:900.000" },
+
+{ id: "chevrolet_corvette_c8", name: "Chevrolet Corvette C8", price: "13.500.000 рублей Утиль:2.025.000" },
+
+{ id: "ferrari_f40", name: "Ferrari F40", price: "40.000.000 рублей Утиль:6.000.000" },
+
+{ id: "lexus_lfa", name: "Lexus LFA", price: "20.000.000 рублей Утиль:3.000.000" },
+
+{ id: "porsche_911_turbo_s", name: "Porsche 911 Turbo S", price: "25.000.000 рублей Утиль:3.750.000" },   
+ { id: "sl65_mercedes_amg", name: "Mercedes SL65 AMG", price: "10.000.000 рублей Утиль: 1.500.000" },
+{ id: "f430_ferrari", name: "Ferrari F430", price: "15.000.000 рублей Утиль: 2.250.000" },
+{ id: "x6m_bmw_f96", name: "BMW X6M F96", price: "15.000.000 рублей Утиль: 2.250.000" },
+{ id: "taycan_porsche_turbo_s", name: "Porsche Taycan Turbo S", price: "13.000.000 рублей Утиль: 1.950.000" },
+{ id: "rs7_audi_c8", name: "Audi RS7 C8", price: "11.000.000 рублей Утиль: 1.650.000" },
+{ id: "austin_seven_24", name: "Austin Seven 24", price: "150.000.000 рублей Утиль: 22.500.000" },
+{ id: "m635csi_bmw_e24", name: "BMW M635CSI E24", price: "16.000.000 рублей Утиль: 2.400.000" },
+{ id: "m5_bmw_f10", name: "BMW M5 F10", price: "4.000.000 рублей Утиль: 600.000" },
+{ id: "m6_bmw_f13", name: "BMW M6 F13", price: "4.000.000 рублей Утиль: 600.000" },
+{ id: "z8_bmw_e52", name: "BMW Z8 E52", price: "30.000.000 рублей Утиль: 4.500.000" },
+{ id: "camaro_zl1", name: "Chevrolet Camaro ZL1", price: "7.500.000 рублей Утиль: 1.125.000" },
+{ id: "ds23_citroen", name: "Citroën DS 23", price: "13.000.000 рублей Утиль: 1.950.000" },
+{ id: "dmc12_delorean", name: "DMC DMC-12", price: "4.000.000 рублей Утиль: 600.000" },
+{ id: "charger_srt", name: "Dodge Charger SRT", price: "7.500.000 рублей Утиль: 1.125.000" },
+{ id: "velociraptor_ford", name: "Ford VelociRaptor", price: "18.000.000 рублей Утиль: 2.700.000" },
+{ id: "jesko_koenigsegg", name: "Koenigsegg Jesko", price: "120.000.000 рублей Утиль: 18.000.000" },
+{ id: "aventador_svj", name: "Lamborghini Aventador SVJ", price: "50.000.000 рублей Утиль: 7.500.000" },
+{ id: "countach_lamborghini", name: "Lamborghini Countach", price: "25.000.000 рублей Утиль: 3.750.000" },
+{ id: "senna_mclaren", name: "McLaren Senna", price: "100.000.000 рублей Утиль: 15.000.000" },
+{ id: "amg_gt_r", name: "Mercedes AMG GT R", price: "20.000.000 рублей Утиль: 3.000.000" },
+{ id: "porsche_918_spyder", name: "Porsche 918 Spyder", price: "35.000.000 рублей Утиль: 5.250.000" },
+{ id: "noble_m600", name: "Noble M600", price: "20.000.000 рублей Утиль: 3.000.000" },
+{ id: "huayra_pagani", name: "Pagani Huayra", price: "250.000.000 рублей Утиль: 37.500.000" },
+{ id: "911_turbo_930", name: "Porsche 911 Turbo 930", price: "14.000.000 рублей Утиль: 2.100.000" },
+{ id: "rs4_b9", name: "Audi RS4 B9 Avant", price: "7.000.000 рублей Утиль: 1.050.000" },
+{ id: "rs5_f5", name: "Audi RS5 F5", price: "5.500.000 рублей Утиль: 825.000" },
+{ id: "rsq8_audi", name: "Audi RSQ8", price: "15.000.000 рублей Утиль: 2.250.000" },
+{ id: "x7_bmw_g07", name: "BMW X7 G07 LCI", price: "15.000.000 рублей Утиль: 2.250.000" },
+{ id: "g650_maybach", name: "Maybach G650 Landaulet", price: "70.000.000 рублей Утиль: 10.500.000" },
+
+
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+        ];
+        // 2. Отображаем все машины на странице при загрузке
+        const carsGrid = document.getElementById('carsGrid');
+        carsData.forEach(car => {
+            const card = document.createElement('div');
+            card.className = 'car-card';
+            card.id = car.id; // Присваиваем ID карточке для плавной прокрутки к ней
+          card.innerHTML = `
+    <h3>${car.name}</h3>
+    <p>Цена: ${car.price}</p>
+    
+`;
+            carsGrid.appendChild(card);
+        });
+
+        // 3. Настраиваем Fuse.js для «умного» поиска
+        const options = {
+            keys: ['name'], // Ищем по полю "name"
+            threshold: 0.4  // Уровень чувствительности к ошибкам (0.0 - точное совпадение, 1.0 - найдет всё подряд)
+        };
+        const fuse = new Fuse(carsData, options);
+
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsBox = document.getElementById('suggestions');
+
+        // 4. Логика ввода текста
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value;
+            
+            if (query.length < 1) {
+                suggestionsBox.style.display = 'none';
+                return;
+            }
+
+            // Ищем совпадения с учетом опечаток
+            const results = fuse.search(query);
+
+            // Очищаем старые подсказки
+            suggestionsBox.innerHTML = '';
+
+            if (results.length > 0) {
+                suggestionsBox.style.display = 'block';
+                
+                // Выводим первые 5 подходящих результатов в выпадающий список
+                results.slice(0, 5).forEach(result => {
+                    const car = result.item;
+                    const div = document.createElement('div');
+                    div.textContent = car.name;
+                    
+                    // Клик по подсказке переносит нас к машине
+                    div.addEventListener('click', () => {
+                        searchInput.value = car.name;
+                        suggestionsBox.style.display = 'none';
+                        
+                        // Скроллим к нужной машине
+                        const element = document.getElementById(car.id);
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Небольшой визуальный эффект (подсветка)
+                        element.style.backgroundColor = '#e6f2ff';
+                        setTimeout(() => { element.style.backgroundColor = 'white'; }, 1500);
+                    });
+                    
+                    suggestionsBox.appendChild(div);
+                });
+            } else {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+
+        // Закрываем список подсказок, если кликнули мимо строки поиска
+        document.addEventListener('click', (e) => {
+            if (e.target !== searchInput) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
